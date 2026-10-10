@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tra ảnh VAECO</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{--bg:#f3f5f7;--panel:#fff;--ink:#14202b;--muted:#5d6b78;--line:#d6dde3;--accent:#0b5fa5;--accent-ink:#fff;--ok:#1d7a46;--err:#b42318;--warn:#9a6700;--mono:ui-monospace,Menlo,Consolas,monospace;color-scheme:light}
+  @media (prefers-color-scheme:dark){:root{--bg:#0f151b;--panel:#17212a;--ink:#e6edf3;--muted:#93a1ae;--line:#2a3743;--accent:#4ea1e6;--accent-ink:#06121c;--ok:#4cc38a;--err:#ff7b72;--warn:#e3b341;color-scheme:dark}}
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Roboto,Arial,sans-serif}
+  main{max-width:640px;margin:0 auto;padding:12px 16px 24px;display:grid;gap:12px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  h1{font-size:18px;margin:0}
+  h1 small{display:block;font-size:12px;font-weight:400;color:var(--muted)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:10px}
+  button,.btn{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:10px 14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+  .primary{background:var(--accent)!important;border-color:var(--accent)!important;color:var(--accent-ink)!important;font-weight:600}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .row>*{flex:1 1 auto}
+  input[type=text]{font:inherit;font-family:var(--mono);text-transform:uppercase;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+  #reader{width:100%;border-radius:8px;overflow:hidden;background:#000;min-height:220px}
+  .status{font-size:14px;padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--line)}
+  .ok{color:var(--ok)}.err{color:var(--err)}.warn{color:var(--warn)}
+  .code{font-family:var(--mono);font-weight:700;font-size:20px}
+  .meta{color:var(--muted);font-size:13px}
+  #photo{width:100%;border-radius:8px;background:var(--bg);display:block;min-height:120px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-family:var(--mono);font-size:12px;padding:6px 8px}
+  .chip[aria-current=true]{border-color:var(--accent);color:var(--accent);font-weight:700}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Tra ảnh theo mã<small>Quét QR / barcode VAECO-xxxx</small></h1>
+    <button id="btn-cam" class="primary" type="button">Bật camera</button>
+  </header>
+
+  <section class="panel">
+    <div id="reader"></div>
+    <div class="row">
+      <label class="btn" style="flex:0 1 auto">Chụp ảnh mã
+        <input id="file-input" type="file" accept="image/*" capture="environment" hidden>
+      </label>
+      <form id="manual" class="row" style="flex:1 1 220px">
+        <input id="code-input" type="text" placeholder="VAECO-2B0014" autocomplete="off">
+        <button type="submit" style="flex:0 0 auto">Tìm</button>
+      </form>
+    </div>
+    <div id="status" class="status">Bấm "Bật camera" rồi đưa mã vào khung.</div>
+  </section>
+
+  <section id="result" class="panel" hidden>
+    <div class="row" style="align-items:baseline">
+      <span id="r-code" class="code"></span>
+      <span id="r-count" class="meta" style="text-align:right"></span>
+    </div>
+    <a id="r-full" target="_blank" rel="noopener"><img id="photo" alt="Ảnh theo mã"></a>
+    <div id="r-meta" class="meta"></div>
+    <div id="chips" class="chips"></div>
+    <div class="row">
+      <a id="r-drive" class="btn" target="_blank" rel="noopener">Mở trên Drive</a>
+      <button id="btn-next" class="primary" type="button">Quét mã tiếp</button>
+    </div>
+  </section>
+</main>
+
+<script>
+// ====== CẤU HÌNH: chỉ cần sửa 2 dòng này ======
+const API_KEY   = 'AIzaSyBz8Zg_cqz-qu3PbiiDBrRI-bfbx5of7-0';
+const FOLDER_ID = '1tFHCwI826iLgvOwq6lep1phwi81OsV-9';
+// ==============================================
+
+const $ = id => document.getElementById(id);
+
+function setStatus(msg, kind){
+  const s = $('status');
+  s.className = 'status' + (kind ? ' ' + kind : '');
+  s.textContent = msg;
+}
+
+// Chấp nhận VAECO-xxx hoặc VAEC0-xxx (số 0); nhập tay có thể bỏ tiền tố
+function parseCode(raw, allowBare){
+  const t = String(raw || '').trim();
+  const m = t.match(/VAEC[O0]\s*-\s*([A-Za-z0-9_.]+)/i);
+  if (m) return m[1].toLowerCase();
+  if (allowBare && /^[A-Za-z0-9_.]+$/.test(t)) return t.toLowerCase();
+  return null;
+}
+
+// Tên ảnh: mã-MMddHHmmss.jpg -> "dd/MM HH:mm:ss"
+function shotTime(name){
+  const m = name.match(/-(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\./);
+  return m ? m[2] + '/' + m[1] + ' ' + m[3] + ':' + m[4] + ':' + m[5] : '';
+}
+
+// ---------- Google Drive API ----------
+async function findFiles(code){
+  const q = "'" + FOLDER_ID + "' in parents and name contains '" + code + "' and trashed = false and mimeType contains 'image/'";
+  const url = 'https://www.googleapis.com/drive/v3/files?' + new URLSearchParams({
+    q: q, key: API_KEY, pageSize: '100',
+    fields: 'files(id,name,size,modifiedTime)', orderBy: 'modifiedTime desc'
+  });
+  const r = await fetch(url);
+  const j = await r.json();
+  if (!r.ok) throw new Error((j.error && j.error.message) || ('Lỗi ' + r.status));
+  return (j.files || []).filter(f => f.name.toLowerCase().startsWith(code + '-'));
+}
+const imgUrl  = id => 'https://www.googleapis.com/drive/v3/files/' + id + '?alt=media&key=' + API_KEY;
+const imgUrl2 = id => 'https://lh3.googleusercontent.com/d/' + id + '=w2000'; // dự phòng
+const viewUrl = id => 'https://drive.google.com/file/d/' + id + '/view';
+
+// ---------- Camera ----------
+let scanner = null, scanning = false, busy = false;
+function getScanner(){
+  if (!scanner) scanner = new Html5Qrcode('reader', {
+    verbose: false,
+    formatsToSupport: Object.values(Html5QrcodeSupportedFormats).filter(v => typeof v === 'number'),
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+  });
+  return scanner;
+}
+async function startCam(){
+  if (scanning) return;
+  try {
+    setStatus('Đang mở camera…');
+    await getScanner().start({ facingMode: 'environment' },
+      { fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.75); return { width: s, height: Math.floor(s * 0.6) }; } },
+      onDecoded, () => {});
+    scanning = true;
+    $('btn-cam').textContent = 'Tắt camera';
+    setStatus('Đưa mã vào khung để quét.');
+  } catch (e) {
+    setStatus('Không mở được camera. Kiểm tra quyền camera của trình duyệt, hoặc dùng "Chụp ảnh mã".', 'warn');
+  }
+}
+async function stopCam(){
+  if (!scanning) return;
+  try { await scanner.stop(); } catch (e) {}
+  scanning = false;
+  $('btn-cam').textContent = 'Bật camera';
+}
+$('btn-cam').onclick = () => scanning ? stopCam() : startCam();
+
+function onDecoded(text){
+  if (busy) return;
+  const code = parseCode(text, false);
+  if (!code) return setStatus('Mã không đúng dạng VAECO-xxxx: ' + text, 'warn');
+  if (navigator.vibrate) navigator.vibrate(80);
+  stopCam();
+  lookup(code);
+}
+
+$('file-input').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  await stopCam();
+  setStatus('Đang đọc mã từ ảnh…');
+  try {
+    const text = await getScanner().scanFile(f, false);
+    const code = parseCode(text, false);
+    if (!code) return setStatus('Mã trong ảnh không đúng dạng VAECO-xxxx: ' + text, 'warn');
+    lookup(code);
+  } catch (err) {
+    setStatus('Không đọc được mã trong ảnh. Chụp gần, đủ sáng, mã nằm thẳng.', 'err');
+  }
+};
+
+$('manual').onsubmit = e => {
+  e.preventDefault();
+  const code = parseCode($('code-input').value, true);
+  if (!code) return setStatus('Mã nhập không hợp lệ.', 'warn');
+  stopCam(); lookup(code);
+};
+
+// ---------- Tra cứu + hiển thị ----------
+let current = [];
+async function lookup(code){
+  busy = true;
+  $('code-input').value = 'VAECO-' + code.toUpperCase();
+  setStatus('Đang tìm ảnh cho ' + code.toUpperCase() + '…');
+  try {
+    current = await findFiles(code);
+    if (!current.length) {
+      $('result').hidden = true;
+      return setStatus('Không có ảnh nào tên bắt đầu bằng "' + code + '-".', 'err');
+    }
+    $('r-code').textContent = 'VAECO-' + code.toUpperCase();
+    $('r-count').textContent = current.length > 1 ? current.length + ' ảnh, đang xem mới nhất' : '1 ảnh';
+    showImage(0);
+  } catch (e) {
+    setStatus('Lỗi: ' + e.message, 'err');
+  } finally { busy = false; }
+}
+
+function showImage(i){
+  const f = current[i];
+  $('result').hidden = false;
+  $('r-drive').href = viewUrl(f.id);
+  $('r-full').href = imgUrl(f.id);
+  $('r-meta').textContent = f.name + (shotTime(f.name) ? ' · chụp ' + shotTime(f.name) : '') + ' · ' + Math.round((f.size || 0) / 1024) + ' KB';
+  const img = $('photo');
+  img.onerror = () => {
+    if (img.dataset.fb !== '1') { img.dataset.fb = '1'; img.src = imgUrl2(f.id); }
+    else setStatus('Không tải được ảnh. Kiểm tra thư mục đã chia sẻ "Bất kỳ ai có đường liên kết".', 'err');
+  };
+  img.onload = () => setStatus('Đã mở ảnh ' + f.name, 'ok');
+  img.dataset.fb = '0';
+  img.src = imgUrl(f.id);
+  setStatus('Đang tải ảnh…');
+
+  const box = $('chips'); box.innerHTML = '';
+  if (current.length > 1) current.forEach((x, k) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip';
+    b.textContent = shotTime(x.name) || x.name;
+    b.setAttribute('aria-current', k === i);
+    b.onclick = () => showImage(k);
+    box.append(b);
+  });
+  $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+$('btn-next').onclick = () => { $('result').hidden = true; window.scrollTo({ top: 0 }); startCam(); };
+
+if (API_KEY.indexOf('DAN_') === 0) setStatus('Chưa cấu hình API_KEY trong file.', 'err');
+</script>
+</body>
+</html>
