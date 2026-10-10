@@ -11,8 +11,7 @@
   *{box-sizing:border-box}
   [hidden]{display:none!important}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Roboto,Arial,sans-serif}
-  main{max-width:640px;margin:0 auto;padding:12px 16px 24px;display:grid;gap:12px}
-  header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  main{max-width:640px;margin:0 auto;padding:12px 16px 24px;display:grid;gap:10px}
   h1{font-size:18px;margin:0}
   h1 small{display:block;font-size:12px;font-weight:400;color:var(--muted)}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:10px}
@@ -20,8 +19,8 @@
   .primary{background:var(--accent)!important;border-color:var(--accent)!important;color:var(--accent-ink)!important;font-weight:600}
   .row{display:flex;gap:8px;flex-wrap:wrap}
   .row>*{flex:1 1 auto}
-  input[type=text]{font:inherit;font-family:var(--mono);text-transform:uppercase;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
-  #reader{width:100%;border-radius:8px;overflow:hidden;background:#000;min-height:220px}
+  input[type=text]{font:inherit;font-family:var(--mono);text-transform:uppercase;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);min-width:0}
+  #reader{width:100%;border-radius:8px;overflow:hidden;background:#000}
   .status{font-size:14px;padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--line)}
   .ok{color:var(--ok)}.err{color:var(--err)}.warn{color:var(--warn)}
   .code{font-family:var(--mono);font-weight:700;font-size:20px}
@@ -30,27 +29,49 @@
   .chips{display:flex;gap:6px;flex-wrap:wrap}
   .chip{font-family:var(--mono);font-size:12px;padding:6px 8px}
   .chip[aria-current=true]{border-color:var(--accent);color:var(--accent);font-weight:700}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .stat{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  .stat b{display:block;font-size:24px;font-variant-numeric:tabular-nums;line-height:1.2}
+  .stat span{font-size:12px;color:var(--muted)}
+  .stat.main b{color:var(--accent)}
+  details summary{cursor:pointer;font-size:13px;color:var(--muted)}
+  #code-list{max-height:240px;overflow:auto;margin-top:8px}
 </style>
 </head>
 <body>
 <main>
-  <header>
-    <h1>Tra ảnh theo mã<small>Quét QR / barcode VAECO-xxxx</small></h1>
-    <button id="btn-cam" class="primary" type="button">Bật camera</button>
-  </header>
+  <h1>Tra ảnh theo mã thẻ<small>Quét QR / barcode VAEC0-xxxx</small></h1>
 
   <section class="panel">
-    <div id="reader"></div>
+    <div class="stats">
+      <div class="stat main"><b id="s-cards">…</b><span>Thẻ đang trong công ty</span></div>
+      <div class="stat"><b id="s-images">…</b><span>Ảnh trong thư mục</span></div>
+    </div>
+    <div class="row" style="align-items:center">
+      <span id="s-meta" class="meta">Đang đếm…</span>
+      <button id="btn-refresh" type="button" style="flex:0 0 auto">Làm mới</button>
+    </div>
+    <details id="list-box">
+      <summary>Danh sách mã thẻ</summary>
+      <input id="list-filter" type="text" placeholder="Lọc mã…" autocomplete="off" style="margin-top:8px">
+      <div id="code-list" class="chips"></div>
+    </details>
+  </section>
+
+  <section class="panel">
     <div class="row">
+      <button id="btn-cam" class="primary" type="button">Mở camera quét</button>
       <label class="btn" style="flex:0 1 auto">Chụp ảnh mã
         <input id="file-input" type="file" accept="image/*" capture="environment" hidden>
       </label>
-      <form id="manual" class="row" style="flex:1 1 220px">
-        <input id="code-input" type="text" placeholder="VAECO-2B0014" autocomplete="off">
-        <button type="submit" style="flex:0 0 auto">Tìm</button>
-      </form>
     </div>
-    <div id="status" class="status">Bấm "Bật camera" rồi đưa mã vào khung.</div>
+    <div id="reader" hidden></div>
+    <div id="reader-file" hidden></div>
+    <form id="manual" class="row">
+      <input id="code-input" type="text" placeholder="Nhập tay: VAEC0-2B0014" autocomplete="off" style="flex:1 1 160px">
+      <button type="submit" style="flex:0 0 auto">Tìm</button>
+    </form>
+    <div id="status" class="status">Bấm "Mở camera quét" hoặc nhập mã.</div>
   </section>
 
   <section id="result" class="panel" hidden>
@@ -70,11 +91,13 @@
 
 <script>
 // ====== CẤU HÌNH: chỉ cần sửa 2 dòng này ======
-const API_KEY   = 'AIzaSyBz8Zg_cqz-qu3PbiiDBrRI-bfbx5of7-0';
+const API_KEY   = 'AIzaSyBz8Zg_cqz-qu3PbiiDBrRI-bfbx5of7-0
+';
 const FOLDER_ID = '1tFHCwI826iLgvOwq6lep1phwi81OsV-9';
 // ==============================================
 
 const $ = id => document.getElementById(id);
+const DRIVE = 'https://www.googleapis.com/drive/v3/files';
 
 function setStatus(msg, kind){
   const s = $('status');
@@ -82,73 +105,120 @@ function setStatus(msg, kind){
   s.textContent = msg;
 }
 
-// Chấp nhận VAECO-xxx hoặc VAEC0-xxx (số 0); nhập tay có thể bỏ tiền tố
+// Đọc mã: chấp nhận VAEC0-xxxx (số 0) và VAECO-xxxx (chữ O),
+// dấu gạch thường/dài hoặc khoảng trắng. Nhập tay có thể bỏ tiền tố.
 function parseCode(raw, allowBare){
   const t = String(raw || '').trim();
-  const m = t.match(/VAEC[O0]\s*-\s*([A-Za-z0-9_.]+)/i);
+  const m = t.match(/VAEC[O0]\s*[-–—_\s]\s*([A-Za-z0-9]+)/i);
   if (m) return m[1].toLowerCase();
-  if (allowBare && /^[A-Za-z0-9_.]+$/.test(t)) return t.toLowerCase();
+  if (allowBare && /^[A-Za-z0-9]+$/.test(t)) return t.toLowerCase();
   return null;
 }
+const label = code => 'VAEC0-' + code.toUpperCase();
 
-// Tên ảnh: mã-MMddHHmmss.jpg -> "dd/MM HH:mm:ss"
 function shotTime(name){
   const m = name.match(/-(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\./);
   return m ? m[2] + '/' + m[1] + ' ' + m[3] + ':' + m[4] + ':' + m[5] : '';
 }
 
-// ---------- Google Drive API ----------
-async function findFiles(code){
-  const q = "'" + FOLDER_ID + "' in parents and name contains '" + code + "' and trashed = false and mimeType contains 'image/'";
-  const url = 'https://www.googleapis.com/drive/v3/files?' + new URLSearchParams({
-    q: q, key: API_KEY, pageSize: '100',
-    fields: 'files(id,name,size,modifiedTime)', orderBy: 'modifiedTime desc'
-  });
-  const r = await fetch(url);
+async function driveList(q, fields, pageToken){
+  const p = { q: q, key: API_KEY, pageSize: '1000', fields: fields, orderBy: 'modifiedTime desc' };
+  if (pageToken) p.pageToken = pageToken;
+  const r = await fetch(DRIVE + '?' + new URLSearchParams(p));
   const j = await r.json();
   if (!r.ok) throw new Error((j.error && j.error.message) || ('Lỗi ' + r.status));
+  return j;
+}
+const baseQ = "'" + FOLDER_ID + "' in parents and trashed = false and mimeType contains 'image/'";
+
+async function findFiles(code){
+  const j = await driveList(baseQ + " and name contains '" + code + "'", 'files(id,name,size,modifiedTime)');
   return (j.files || []).filter(f => f.name.toLowerCase().startsWith(code + '-'));
 }
-const imgUrl  = id => 'https://www.googleapis.com/drive/v3/files/' + id + '?alt=media&key=' + API_KEY;
-const imgUrl2 = id => 'https://lh3.googleusercontent.com/d/' + id + '=w2000'; // dự phòng
+const imgUrl  = id => DRIVE + '/' + id + '?alt=media&key=' + API_KEY;
+const imgUrl2 = id => 'https://lh3.googleusercontent.com/d/' + id + '=w2000';
 const viewUrl = id => 'https://drive.google.com/file/d/' + id + '/view';
 
-// ---------- Camera ----------
-let scanner = null, scanning = false, busy = false;
-function getScanner(){
-  if (!scanner) scanner = new Html5Qrcode('reader', {
-    verbose: false,
-    formatsToSupport: Object.values(Html5QrcodeSupportedFormats).filter(v => typeof v === 'number'),
-    experimentalFeatures: { useBarCodeDetectorIfSupported: true }
-  });
-  return scanner;
+// ---------- Thống kê ----------
+let allCodes = [];
+async function loadStats(){
+  $('s-meta').textContent = 'Đang đếm…';
+  try {
+    let token = '', files = [];
+    do {
+      const j = await driveList(baseQ, 'nextPageToken,files(name)', token);
+      files = files.concat(j.files || []);
+      token = j.nextPageToken || '';
+    } while (token);
+
+    const counts = {};
+    files.forEach(f => {
+      const i = f.name.indexOf('-');
+      if (i > 0) { const c = f.name.slice(0, i).toLowerCase(); counts[c] = (counts[c] || 0) + 1; }
+    });
+    allCodes = Object.keys(counts).sort();
+    const multi = allCodes.filter(c => counts[c] > 1).length;
+
+    $('s-images').textContent = files.length.toLocaleString('vi-VN');
+    $('s-cards').textContent = allCodes.length.toLocaleString('vi-VN');
+    const now = new Date();
+    $('s-meta').textContent = 'Cập nhật ' + now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) +
+      (multi ? ' · ' + multi + ' thẻ có nhiều hơn 1 ảnh' : '');
+    renderList();
+  } catch (e) {
+    $('s-cards').textContent = '–'; $('s-images').textContent = '–';
+    $('s-meta').textContent = 'Không đếm được: ' + e.message;
+  }
 }
+function renderList(){
+  const f = $('list-filter').value.trim().toLowerCase();
+  const box = $('code-list'); box.innerHTML = '';
+  allCodes.filter(c => !f || c.includes(f)).forEach(c => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip';
+    b.textContent = c.toUpperCase();
+    b.onclick = () => { stopCam(); lookup(c); };
+    box.append(b);
+  });
+}
+$('list-filter').oninput = renderList;
+$('btn-refresh').onclick = loadStats;
+
+// ---------- Camera ----------
+let scanner = null, fileScanner = null, scanning = false, busy = false;
+const fmts = () => Object.values(Html5QrcodeSupportedFormats).filter(v => typeof v === 'number');
+const opts = () => ({ verbose: false, formatsToSupport: fmts(), experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
+
 async function startCam(){
   if (scanning) return;
+  $('result').hidden = true;
+  $('reader').hidden = false;
   try {
     setStatus('Đang mở camera…');
-    await getScanner().start({ facingMode: 'environment' },
+    if (!scanner) scanner = new Html5Qrcode('reader', opts());
+    await scanner.start({ facingMode: 'environment' },
       { fps: 10, qrbox: (w, h) => { const s = Math.floor(Math.min(w, h) * 0.75); return { width: s, height: Math.floor(s * 0.6) }; } },
       onDecoded, () => {});
     scanning = true;
     $('btn-cam').textContent = 'Tắt camera';
     setStatus('Đưa mã vào khung để quét.');
   } catch (e) {
+    $('reader').hidden = true;
     setStatus('Không mở được camera. Kiểm tra quyền camera của trình duyệt, hoặc dùng "Chụp ảnh mã".', 'warn');
   }
 }
 async function stopCam(){
-  if (!scanning) return;
-  try { await scanner.stop(); } catch (e) {}
+  if (scanning) { try { await scanner.stop(); } catch (e) {} }
   scanning = false;
-  $('btn-cam').textContent = 'Bật camera';
+  $('reader').hidden = true;
+  $('btn-cam').textContent = 'Mở camera quét';
 }
-$('btn-cam').onclick = () => scanning ? stopCam() : startCam();
+$('btn-cam').onclick = () => scanning ? stopCam().then(() => setStatus('Đã tắt camera.')) : startCam();
 
 function onDecoded(text){
   if (busy) return;
   const code = parseCode(text, false);
-  if (!code) return setStatus('Mã không đúng dạng VAECO-xxxx: ' + text, 'warn');
+  if (!code) return setStatus('Mã không đúng dạng VAEC0-xxxx: ' + text, 'warn');
   if (navigator.vibrate) navigator.vibrate(80);
   stopCam();
   lookup(code);
@@ -160,9 +230,10 @@ $('file-input').onchange = async e => {
   await stopCam();
   setStatus('Đang đọc mã từ ảnh…');
   try {
-    const text = await getScanner().scanFile(f, false);
+    if (!fileScanner) fileScanner = new Html5Qrcode('reader-file', opts());
+    const text = await fileScanner.scanFile(f, false);
     const code = parseCode(text, false);
-    if (!code) return setStatus('Mã trong ảnh không đúng dạng VAECO-xxxx: ' + text, 'warn');
+    if (!code) return setStatus('Mã trong ảnh không đúng dạng VAEC0-xxxx: ' + text, 'warn');
     lookup(code);
   } catch (err) {
     setStatus('Không đọc được mã trong ảnh. Chụp gần, đủ sáng, mã nằm thẳng.', 'err');
@@ -180,15 +251,15 @@ $('manual').onsubmit = e => {
 let current = [];
 async function lookup(code){
   busy = true;
-  $('code-input').value = 'VAECO-' + code.toUpperCase();
-  setStatus('Đang tìm ảnh cho ' + code.toUpperCase() + '…');
+  $('code-input').value = label(code);
+  setStatus('Đang tìm ảnh cho ' + label(code) + '…');
   try {
     current = await findFiles(code);
     if (!current.length) {
       $('result').hidden = true;
-      return setStatus('Không có ảnh nào tên bắt đầu bằng "' + code + '-".', 'err');
+      return setStatus('Không có ảnh cho ' + label(code) + ' (thẻ không có trong thư mục).', 'err');
     }
-    $('r-code').textContent = 'VAECO-' + code.toUpperCase();
+    $('r-code').textContent = label(code);
     $('r-count').textContent = current.length > 1 ? current.length + ' ảnh, đang xem mới nhất' : '1 ảnh';
     showImage(0);
   } catch (e) {
@@ -224,9 +295,14 @@ function showImage(i){
   $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-$('btn-next').onclick = () => { $('result').hidden = true; window.scrollTo({ top: 0 }); startCam(); };
+$('btn-next').onclick = () => { window.scrollTo({ top: 0 }); startCam(); };
 
-if (API_KEY.indexOf('DAN_') === 0) setStatus('Chưa cấu hình API_KEY trong file.', 'err');
+if (API_KEY.indexOf('DAN_') === 0) {
+  setStatus('Chưa cấu hình API_KEY trong file.', 'err');
+  $('s-meta').textContent = 'Chưa có API key.';
+} else {
+  loadStats();
+}
 </script>
 </body>
 </html>
