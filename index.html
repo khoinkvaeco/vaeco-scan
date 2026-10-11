@@ -3,100 +3,147 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Tra ảnh VAECO</title>
+<title>Kiểm tra thẻ VAECO</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer onload="window.onGisLoad && onGisLoad()"></script>
 <style>
-  :root{--bg:#f3f5f7;--panel:#fff;--ink:#14202b;--muted:#5d6b78;--line:#d6dde3;--accent:#0b5fa5;--accent-ink:#fff;--ok:#1d7a46;--err:#b42318;--warn:#9a6700;--mono:ui-monospace,Menlo,Consolas,monospace;color-scheme:light}
-  @media (prefers-color-scheme:dark){:root{--bg:#0f151b;--panel:#17212a;--ink:#e6edf3;--muted:#93a1ae;--line:#2a3743;--accent:#4ea1e6;--accent-ink:#06121c;--ok:#4cc38a;--err:#ff7b72;--warn:#e3b341;color-scheme:dark}}
+  :root{--bg:#f3f5f7;--panel:#fff;--ink:#14202b;--muted:#5d6b78;--line:#d6dde3;--accent:#0b5fa5;--accent-ink:#fff;
+    --ok:#1d7a46;--ok-bg:#e3f4ea;--err:#b42318;--err-bg:#fde8e6;--warn:#9a6700;--mono:ui-monospace,Menlo,Consolas,monospace;color-scheme:light}
+  @media (prefers-color-scheme:dark){:root{--bg:#0f151b;--panel:#17212a;--ink:#e6edf3;--muted:#93a1ae;--line:#2a3743;--accent:#4ea1e6;--accent-ink:#06121c;
+    --ok:#4cc38a;--ok-bg:#12301f;--err:#ff7b72;--err-bg:#3a1512;--warn:#e3b341;color-scheme:dark}}
   *{box-sizing:border-box}
   [hidden]{display:none!important}
   body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Roboto,Arial,sans-serif}
   main{max-width:640px;margin:0 auto;padding:12px 16px 24px;display:grid;gap:10px}
+  header{display:flex;justify-content:space-between;align-items:center;gap:8px}
   h1{font-size:18px;margin:0}
   h1 small{display:block;font-size:12px;font-weight:400;color:var(--muted)}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:10px}
   button,.btn{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:10px 14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+  button:disabled{opacity:.5;cursor:default}
   .primary{background:var(--accent)!important;border-color:var(--accent)!important;color:var(--accent-ink)!important;font-weight:600}
+  .good{background:var(--ok)!important;border-color:var(--ok)!important;color:#fff!important;font-weight:600}
+  .bad{background:var(--err)!important;border-color:var(--err)!important;color:#fff!important;font-weight:600}
+  .small{padding:6px 10px;font-size:13px}
   .row{display:flex;gap:8px;flex-wrap:wrap}
   .row>*{flex:1 1 auto}
-  input[type=text]{font:inherit;font-family:var(--mono);text-transform:uppercase;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);min-width:0}
+  input[type=text]{font:inherit;width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);min-width:0}
+  .codein{font-family:var(--mono)!important;text-transform:uppercase}
   #reader{width:100%;border-radius:8px;overflow:hidden;background:#000}
   .status{font-size:14px;padding:8px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--line)}
   .ok{color:var(--ok)}.err{color:var(--err)}.warn{color:var(--warn)}
-  .code{font-family:var(--mono);font-weight:700;font-size:20px}
   .meta{color:var(--muted);font-size:13px}
-  #photo{width:100%;border-radius:8px;background:var(--bg);display:block;min-height:120px}
+  .banner{border-radius:8px;padding:10px 12px;font-weight:700;display:grid;gap:2px}
+  .banner .code{font-family:var(--mono);font-size:22px}
+  .banner.okb{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok)}
+  .banner.errb{background:var(--err-bg);color:var(--err);border:1px solid var(--err)}
+  .banner span{font-weight:400;font-size:13px}
+  #photo{width:100%;border-radius:8px;background:var(--bg);display:block;min-height:160px;cursor:zoom-in}
   .chips{display:flex;gap:6px;flex-wrap:wrap}
   .chip{font-family:var(--mono);font-size:12px;padding:6px 8px}
   .chip[aria-current=true]{border-color:var(--accent);color:var(--accent);font-weight:700}
-  .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .stat{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
-  .stat b{display:block;font-size:24px;font-variant-numeric:tabular-nums;line-height:1.2}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+  .stat b{display:block;font-size:22px;font-variant-numeric:tabular-nums;line-height:1.2}
   .stat span{font-size:12px;color:var(--muted)}
   .stat.main b{color:var(--accent)}
   details summary{cursor:pointer;font-size:13px;color:var(--muted)}
   #code-list{max-height:240px;overflow:auto;margin-top:8px}
+  #zoom{position:fixed;inset:0;background:#000;z-index:10;overflow:auto}
+  #zoom img{width:100%;display:block}
+  #zoom button{position:fixed;top:10px;right:10px;background:#000c;color:#fff}
 </style>
 </head>
 <body>
 <main>
-  <h1>Tra ảnh theo mã thẻ<small>Quét QR / barcode VAEC0-xxxx</small></h1>
+  <header>
+    <h1>Kiểm tra thẻ ngẫu nhiên<small>Quét QR / barcode VAEC0-xxxx</small></h1>
+    <div id="who" class="meta" style="text-align:right" hidden>
+      <div id="who-email"></div>
+      <button id="btn-logout" class="small" type="button">Đăng xuất</button>
+    </div>
+  </header>
 
-  <section class="panel">
-    <div class="stats">
-      <div class="stat main"><b id="s-cards">…</b><span>Thẻ đang trong công ty</span></div>
-      <div class="stat"><b id="s-images">…</b><span>Ảnh trong thư mục</span></div>
-    </div>
-    <div class="row" style="align-items:center">
-      <span id="s-meta" class="meta">Đang đếm…</span>
-      <button id="btn-refresh" type="button" style="flex:0 0 auto">Làm mới</button>
-    </div>
-    <details id="list-box">
-      <summary>Danh sách mã thẻ</summary>
-      <input id="list-filter" type="text" placeholder="Lọc mã…" autocomplete="off" style="margin-top:8px">
-      <div id="code-list" class="chips"></div>
-    </details>
+  <section id="login" class="panel">
+    <div>Đăng nhập bằng tài khoản Google đã được cấp quyền xem thư mục ảnh thẻ.</div>
+    <button id="btn-login" class="primary" type="button" disabled>Đang tải…</button>
+    <div id="login-msg" class="meta"></div>
   </section>
 
-  <section class="panel">
-    <div class="row">
-      <button id="btn-cam" class="primary" type="button">Mở camera quét</button>
-      <label class="btn" style="flex:0 1 auto">Chụp ảnh mã
-        <input id="file-input" type="file" accept="image/*" capture="environment" hidden>
-      </label>
-    </div>
-    <div id="reader" hidden></div>
-    <div id="reader-file" hidden></div>
-    <form id="manual" class="row">
-      <input id="code-input" type="text" placeholder="Nhập tay: VAEC0-2B0014" autocomplete="off" style="flex:1 1 160px">
-      <button type="submit" style="flex:0 0 auto">Tìm</button>
-    </form>
-    <div id="status" class="status">Bấm "Mở camera quét" hoặc nhập mã.</div>
-  </section>
+  <div id="app" hidden style="display:grid;gap:10px">
+    <section class="panel">
+      <input id="place" type="text" placeholder="Vị trí kiểm tra (vd: Cổng 1, Hangar A2)" autocomplete="off">
+      <div class="row">
+        <button id="btn-cam" class="primary" type="button">Mở camera quét</button>
+        <label class="btn" style="flex:0 1 auto">Chụp ảnh mã
+          <input id="file-input" type="file" accept="image/*" capture="environment" hidden>
+        </label>
+      </div>
+      <div id="reader" hidden></div>
+      <div id="reader-file" hidden></div>
+      <form id="manual" class="row">
+        <input id="code-input" class="codein" type="text" placeholder="Nhập tay: VAEC0-2B0014" autocomplete="off" style="flex:1 1 160px">
+        <button type="submit" style="flex:0 0 auto">Tìm</button>
+      </form>
+      <div id="status" class="status">Bấm "Mở camera quét" để kiểm tra thẻ.</div>
+    </section>
 
-  <section id="result" class="panel" hidden>
-    <div class="row" style="align-items:baseline">
-      <span id="r-code" class="code"></span>
-      <span id="r-count" class="meta" style="text-align:right"></span>
-    </div>
-    <a id="r-full" target="_blank" rel="noopener"><img id="photo" alt="Ảnh theo mã"></a>
-    <div id="r-meta" class="meta"></div>
-    <div id="chips" class="chips"></div>
-    <div class="row">
-      <a id="r-drive" class="btn" target="_blank" rel="noopener">Mở trên Drive</a>
-      <button id="btn-next" class="primary" type="button">Quét mã tiếp</button>
-    </div>
-  </section>
+    <section id="result" class="panel" hidden>
+      <div id="banner" class="banner"></div>
+      <img id="photo" alt="Ảnh đăng ký của thẻ" hidden>
+      <div id="r-meta" class="meta"></div>
+      <div id="chips" class="chips"></div>
+      <div id="verify" class="row">
+        <button id="btn-match" class="good" type="button">Đúng người</button>
+        <button id="btn-nomatch" class="bad" type="button">Không khớp</button>
+      </div>
+      <input id="note" type="text" placeholder="Ghi chú (không bắt buộc)" autocomplete="off">
+      <div id="logged" class="meta"></div>
+      <div class="row">
+        <a id="r-drive" class="btn" target="_blank" rel="noopener">Mở trên Drive</a>
+        <button id="btn-next" class="primary" type="button">Kiểm tra thẻ tiếp</button>
+      </div>
+    </section>
+
+    <section id="stats" class="panel">
+      <div class="stats">
+        <div class="stat main"><b id="s-cards">…</b><span>Thẻ trong công ty</span></div>
+        <div class="stat"><b id="s-today">0</b><span>Bạn đã kiểm tra hôm nay</span></div>
+        <div class="stat"><b id="s-bad" class="err">0</b><span>Vi phạm hôm nay</span></div>
+      </div>
+      <div class="row" style="align-items:center">
+        <span id="s-meta" class="meta">Đang đếm…</span>
+        <button id="btn-refresh" class="small" type="button" style="flex:0 0 auto">Làm mới</button>
+      </div>
+      <details>
+        <summary>Danh sách mã thẻ</summary>
+        <input id="list-filter" class="codein" type="text" placeholder="Lọc mã…" autocomplete="off" style="margin-top:8px">
+        <div id="code-list" class="chips"></div>
+      </details>
+    </section>
+  </div>
 </main>
 
-<script>
-// ====== CẤU HÌNH: chỉ cần sửa 2 dòng này ======
-const API_KEY   = 'AIzaSyD9kmDmO9bru1mSpClGQ614h6HCf9o9TX0';
-const FOLDER_ID = '1tFHCwI826iLgvOwq6lep1phwi81OsV-9';
-// ==============================================
+<div id="zoom" hidden><button type="button" id="zoom-close">Đóng</button><img id="zoom-img" alt=""></div>
 
-const $ = id => document.getElementById(id);
+<script>
+// ================= CẤU HÌNH =================
+const CLIENT_ID    = '87657856106-ie78sirdolp4f2s6op77h3r3ept3v97o.apps.googleusercontent.com';
+const FOLDER_ID    = '1tFHCwI826iLgvOwq6lep1phwi81OsV-9';
+const LOG_SHEET_ID = '1OG6UyyzUCnubrL1mMxREBJwiKleAHsQwM_ot4FJpmDg';   // Google Sheet ghi nhật ký kiểm tra. Để '' nếu chưa dùng.
+// ============================================
+
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+const SHEET_SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+const SCOPES = 'openid email ' + DRIVE_SCOPE + (LOG_SHEET_ID ? ' ' + SHEET_SCOPE : '');
 const DRIVE = 'https://www.googleapis.com/drive/v3/files';
+const $ = id => document.getElementById(id);
+const store = (s => ({
+  get(k){ try { return s().getItem(k); } catch(e){ return null; } },
+  set(k,v){ try { s().setItem(k,v); } catch(e){} },
+  del(k){ try { s().removeItem(k); } catch(e){} }
+}));
+const sess = store(() => sessionStorage), local = store(() => localStorage);
 
 function setStatus(msg, kind){
   const s = $('status');
@@ -104,8 +151,87 @@ function setStatus(msg, kind){
   s.textContent = msg;
 }
 
-// Đọc mã: chấp nhận VAEC0-xxxx (số 0) và VAECO-xxxx (chữ O),
-// dấu gạch thường/dài hoặc khoảng trắng. Nhập tay có thể bỏ tiền tố.
+// ================= ĐĂNG NHẬP (Google OAuth) =================
+let tokenClient = null, token = null, tokenExp = 0, userEmail = local.get('email') || '';
+let pending = null;
+
+function onGisLoad(){
+  if (CLIENT_ID.indexOf('DAN_') === 0) { $('btn-login').textContent = 'Chưa cấu hình CLIENT_ID'; return; }
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID, scope: SCOPES,
+    callback: r => {
+      if (r.error) return pending && pending.rej(new Error(r.error_description || r.error));
+      if (!google.accounts.oauth2.hasGrantedAllScopes(r, DRIVE_SCOPE))
+        return pending && pending.rej(new Error('Bạn cần tick cho phép xem file Google Drive.'));
+      if (LOG_SHEET_ID && !google.accounts.oauth2.hasGrantedAllScopes(r, SHEET_SCOPE))
+        return pending && pending.rej(new Error('Bạn cần tick cho phép ghi Google Sheets (nhật ký kiểm tra).'));
+      token = r.access_token;
+      tokenExp = Date.now() + (Number(r.expires_in) - 60) * 1000;
+      sess.set('tok', token); sess.set('exp', String(tokenExp));
+      pending && pending.res();
+    },
+    error_callback: e => pending && pending.rej(new Error(e.type === 'popup_closed' ? 'Đã đóng cửa sổ đăng nhập.' : (e.message || e.type)))
+  });
+  $('btn-login').disabled = false;
+  $('btn-login').textContent = 'Đăng nhập Google';
+}
+
+function requestToken(){
+  return new Promise((res, rej) => {
+    if (!tokenClient) return rej(new Error('Thư viện đăng nhập chưa tải xong.'));
+    pending = { res, rej };
+    tokenClient.requestAccessToken({ prompt: '', login_hint: userEmail || undefined });
+  });
+}
+const tokenOk = (marginMs = 0) => token && Date.now() + marginMs < tokenExp;
+const ensureFresh = () => tokenOk(5 * 60 * 1000) ? Promise.resolve() : requestToken();
+
+class AuthError extends Error {}
+async function api(url, opts = {}){
+  if (!tokenOk()) { showLogin('Phiên đăng nhập đã hết hạn. Bấm đăng nhập lại.'); throw new AuthError('Phiên đăng nhập đã hết hạn.'); }
+  opts.headers = Object.assign({ Authorization: 'Bearer ' + token }, opts.headers || {});
+  const r = await fetch(url, opts);
+  if (r.status === 401) { clearToken(); showLogin('Phiên đăng nhập đã hết hạn. Bấm đăng nhập lại.'); throw new AuthError('Phiên đăng nhập đã hết hạn.'); }
+  return r;
+}
+async function apiJson(url, opts){
+  const r = await api(url, opts);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const m = (j.error && j.error.message) || ('Lỗi ' + r.status);
+    throw new Error(r.status === 403 || r.status === 404 ? 'Tài khoản không có quyền truy cập (' + m + ')' : m);
+  }
+  return j;
+}
+
+function clearToken(){ token = null; tokenExp = 0; sess.del('tok'); sess.del('exp'); }
+function showLogin(msg){
+  stopCam();
+  $('app').hidden = true; $('who').hidden = true; $('login').hidden = false;
+  $('login-msg').textContent = msg || '';
+}
+async function afterLogin(){
+  $('login').hidden = true; $('app').hidden = false; $('who').hidden = false;
+  try {
+    const u = await apiJson('https://www.googleapis.com/oauth2/v3/userinfo');
+    userEmail = u.email || ''; local.set('email', userEmail);
+  } catch (e) {}
+  $('who-email').textContent = userEmail;
+  renderToday();
+  loadStats();
+}
+
+$('btn-login').onclick = () => {
+  $('login-msg').textContent = '';
+  requestToken().then(afterLogin).catch(e => { $('login-msg').textContent = e.message; });
+};
+$('btn-logout').onclick = () => {
+  if (token && window.google) google.accounts.oauth2.revoke(token, () => {});
+  clearToken(); local.del('email'); userEmail = '';
+  showLogin('Đã đăng xuất.');
+};
+
+// ================= MÃ THẺ =================
 function parseCode(raw, allowBare){
   const t = String(raw || '').trim();
   const m = t.match(/VAEC[O0]\s*[-–—_\s]\s*([A-Za-z0-9]+)/i);
@@ -114,58 +240,83 @@ function parseCode(raw, allowBare){
   return null;
 }
 const label = code => 'VAEC0-' + code.toUpperCase();
-
+// Tên file ảnh: <mã>-<MMDDhhmmss>.jpg, chấp nhận cả tiền tố "VAEC0-".
+function fileCode(name){
+  const m = String(name).match(/^(?:VAEC[O0][-_\s]*)?([A-Za-z0-9]+)-/i);
+  return m ? m[1].toLowerCase() : null;
+}
 function shotTime(name){
   const m = name.match(/-(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\./);
   return m ? m[2] + '/' + m[1] + ' ' + m[3] + ':' + m[4] + ':' + m[5] : '';
 }
 
-async function driveList(q, fields, pageToken){
-  const p = { q: q, key: API_KEY, pageSize: '1000', fields: fields, orderBy: 'modifiedTime desc' };
+// ================= DRIVE =================
+const FOLDER_MIME = 'application/vnd.google-apps.folder';
+const inParents = ids => '(' + ids.map(id => "'" + id + "' in parents").join(' or ') + ')';
+function listUrl(q, fields, pageToken){
+  const p = { q: q, pageSize: '1000', fields: fields, orderBy: 'modifiedTime desc',
+              supportsAllDrives: 'true', includeItemsFromAllDrives: 'true' };
   if (pageToken) p.pageToken = pageToken;
-  const r = await fetch(DRIVE + '?' + new URLSearchParams(p));
-  const j = await r.json();
-  if (!r.ok) throw new Error((j.error && j.error.message) || ('Lỗi ' + r.status));
-  return j;
+  return DRIVE + '?' + new URLSearchParams(p);
 }
-const baseQ = "'" + FOLDER_ID + "' in parents and trashed = false and mimeType contains 'image/'";
-
+// Liệt kê mọi file con trực tiếp của các thư mục ids (chia nhóm để câu truy vấn không quá dài).
+async function listIn(ids, extraQ, fields){
+  let out = [];
+  for (let i = 0; i < ids.length; i += 40) {
+    const q = inParents(ids.slice(i, i + 40)) + ' and trashed = false' + extraQ;
+    let pageToken = '';
+    do {
+      const j = await apiJson(listUrl(q, 'nextPageToken,files(' + fields + ')', pageToken));
+      out = out.concat(j.files || []);
+      pageToken = j.nextPageToken || '';
+    } while (pageToken);
+  }
+  return out;
+}
+// Thư mục gốc + toàn bộ thư mục con (mọi cấp).
+let foldersP = null;
+function getFolders(force){
+  if (force || !foldersP) foldersP = (async () => {
+    const all = [FOLDER_ID];
+    let level = [FOLDER_ID];
+    while (level.length) {
+      level = (await listIn(level, " and mimeType = '" + FOLDER_MIME + "'", 'id')).map(f => f.id).filter(id => !all.includes(id));
+      all.push(...level);
+    }
+    return all;
+  })().catch(e => { foldersP = null; throw e; });
+  return foldersP;
+}
 async function findFiles(code){
-  const j = await driveList(baseQ + " and name contains '" + code + "'", 'files(id,name,size,modifiedTime)');
-  return (j.files || []).filter(f => f.name.toLowerCase().startsWith(code + '-'));
+  const files = await listIn(await getFolders(), " and mimeType contains 'image/' and name contains '" + code + "'", 'id,name,size,modifiedTime');
+  return files.filter(f => fileCode(f.name) === code)
+              .sort((a, b) => String(b.modifiedTime).localeCompare(String(a.modifiedTime)));
 }
-const imgUrl  = id => DRIVE + '/' + id + '?alt=media&key=' + API_KEY;
-const imgUrl2 = id => 'https://lh3.googleusercontent.com/d/' + id + '=w2000';
-const viewUrl = id => 'https://drive.google.com/file/d/' + id + '/view';
 
-// ---------- Thống kê ----------
+// ================= THỐNG KÊ =================
 let allCodes = [];
 async function loadStats(){
   $('s-meta').textContent = 'Đang đếm…';
   try {
-    let token = '', files = [];
-    do {
-      const j = await driveList(baseQ, 'nextPageToken,files(name)', token);
-      files = files.concat(j.files || []);
-      token = j.nextPageToken || '';
-    } while (token);
-
-    const counts = {};
-    files.forEach(f => {
-      const i = f.name.indexOf('-');
-      if (i > 0) { const c = f.name.slice(0, i).toLowerCase(); counts[c] = (counts[c] || 0) + 1; }
-    });
-    allCodes = Object.keys(counts).sort();
-    const multi = allCodes.filter(c => counts[c] > 1).length;
-
-    $('s-images').textContent = files.length.toLocaleString('vi-VN');
-    $('s-cards').textContent = allCodes.length.toLocaleString('vi-VN');
-    const now = new Date();
-    $('s-meta').textContent = 'Cập nhật ' + now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) +
-      (multi ? ' · ' + multi + ' thẻ có nhiều hơn 1 ảnh' : '');
+    const folders = await getFolders(true);
+    const files = await listIn(folders, " and mimeType != '" + FOLDER_MIME + "'", 'name,mimeType');
+    const images = files.filter(f => /^image\//.test(f.mimeType));
+    const codes = new Set();
+    let badName = 0;
+    images.forEach(f => { const c = fileCode(f.name); if (c) codes.add(c); else badName++; });
+    allCodes = [...codes].sort();
+    const n = x => x.toLocaleString('vi-VN');
+    const parts = [n(images.length) + ' ảnh'];
+    if (folders.length > 1) parts.push(n(folders.length - 1) + ' thư mục con');
+    if (files.length > images.length) parts.push(n(files.length - images.length) + ' file không phải ảnh (bỏ qua)');
+    if (badName) parts.push(n(badName) + ' ảnh sai tên (bỏ qua)');
+    parts.push('cập nhật ' + new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }));
+    $('s-cards').textContent = n(allCodes.length);
+    $('s-meta').textContent = parts.join(' · ');
+    if (!files.length) $('s-meta').textContent += ' — thư mục ảnh đang trống hoặc tài khoản chưa được chia sẻ ảnh.';
     renderList();
   } catch (e) {
-    $('s-cards').textContent = '–'; $('s-images').textContent = '–';
+    $('s-cards').textContent = '–';
     $('s-meta').textContent = 'Không đếm được: ' + e.message;
   }
 }
@@ -174,16 +325,50 @@ function renderList(){
   const box = $('code-list'); box.innerHTML = '';
   allCodes.filter(c => !f || c.includes(f)).forEach(c => {
     const b = document.createElement('button');
-    b.type = 'button'; b.className = 'chip';
-    b.textContent = c.toUpperCase();
-    b.onclick = () => { stopCam(); lookup(c); };
+    b.type = 'button'; b.className = 'chip'; b.textContent = c.toUpperCase();
+    b.onclick = () => mustVerifyFirst() || ensureFresh().then(() => { stopCam(); lookup(c); }).catch(e => setStatus(e.message, 'err'));
     box.append(b);
   });
 }
 $('list-filter').oninput = renderList;
-$('btn-refresh').onclick = loadStats;
+$('btn-refresh').onclick = () => ensureFresh().then(loadStats).catch(e => setStatus(e.message, 'err'));
 
-// ---------- Camera ----------
+const todayKey = () => 'checks-' + (userEmail || '-') + '-' + new Date().toLocaleDateString('sv-SE');
+function getToday(){ try { return JSON.parse(local.get(todayKey())) || { n: 0, bad: 0 }; } catch(e){ return { n: 0, bad: 0 }; } }
+function addToday(isBad){ const t = getToday(); t.n++; if (isBad) t.bad++; local.set(todayKey(), JSON.stringify(t)); renderToday(); }
+function renderToday(){ const t = getToday(); $('s-today').textContent = t.n; $('s-bad').textContent = t.bad; }
+
+// ================= NHẬT KÝ (Google Sheet) =================
+$('place').value = local.get('place') || '';
+$('place').onchange = () => local.set('place', $('place').value.trim());
+const pad = n => String(n).padStart(2, '0');
+function nowStr(){ const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
+
+async function logCheck(code, result, fileName){
+  addToday(result !== 'Đúng người');
+  if (!LOG_SHEET_ID) { $('logged').textContent = 'Đã ghi nhận trên máy này (chưa cấu hình Sheet nhật ký).'; return; }
+  $('logged').textContent = 'Đang ghi nhật ký…';
+  try {
+    await apiJson('https://sheets.googleapis.com/v4/spreadsheets/' + LOG_SHEET_ID +
+      '/values/A:G:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values: [[ nowStr(), label(code), result, $('place').value.trim(), userEmail, fileName || '', $('note').value.trim() ]] })
+    });
+    $('logged').textContent = 'Đã ghi nhật ký lúc ' + nowStr().slice(11) + '.';
+  } catch (e) {
+    $('logged').textContent = 'Chưa ghi được nhật ký: ' + e.message;
+  }
+}
+
+// Thẻ đang hiển thị mà chưa chọn "Đúng người"/"Không khớp" thì không cho sang thẻ khác.
+function mustVerifyFirst(){
+  if ($('result').hidden || logged) return false;
+  setStatus('Chọn "Đúng người" hoặc "Không khớp" cho ' + label(currentCode) + ' trước khi kiểm tra thẻ khác.', 'warn');
+  $('verify').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  return true;
+}
+
+// ================= CAMERA =================
 let scanner = null, fileScanner = null, scanning = false, busy = false;
 const fmts = () => Object.values(Html5QrcodeSupportedFormats).filter(v => typeof v === 'number');
 const opts = () => ({ verbose: false, formatsToSupport: fmts(), experimentalFeatures: { useBarCodeDetectorIfSupported: true } });
@@ -212,7 +397,11 @@ async function stopCam(){
   $('reader').hidden = true;
   $('btn-cam').textContent = 'Mở camera quét';
 }
-$('btn-cam').onclick = () => scanning ? stopCam().then(() => setStatus('Đã tắt camera.')) : startCam();
+$('btn-cam').onclick = () => {
+  if (!scanning && mustVerifyFirst()) return;
+  if (scanning) return stopCam().then(() => setStatus('Đã tắt camera.'));
+  ensureFresh().then(startCam).catch(e => setStatus(e.message, 'err'));
+};
 
 function onDecoded(text){
   if (busy) return;
@@ -225,7 +414,7 @@ function onDecoded(text){
 
 $('file-input').onchange = async e => {
   const f = e.target.files[0]; e.target.value = '';
-  if (!f) return;
+  if (!f || mustVerifyFirst()) return;
   await stopCam();
   setStatus('Đang đọc mã từ ảnh…');
   try {
@@ -241,67 +430,103 @@ $('file-input').onchange = async e => {
 
 $('manual').onsubmit = e => {
   e.preventDefault();
+  if (mustVerifyFirst()) return;
   const code = parseCode($('code-input').value, true);
   if (!code) return setStatus('Mã nhập không hợp lệ.', 'warn');
-  stopCam(); lookup(code);
+  ensureFresh().then(() => { stopCam(); lookup(code); }).catch(err => setStatus(err.message, 'err'));
 };
 
-// ---------- Tra cứu + hiển thị ----------
-let current = [];
+// ================= TRA CỨU + ĐỐI CHIẾU =================
+let current = [], currentCode = '', currentFile = '', photoUrl = null, logged = false;
+
+function banner(kind, title, sub){
+  const b = $('banner');
+  b.className = 'banner ' + kind;
+  b.innerHTML = '';
+  const c = document.createElement('div'); c.className = 'code'; c.textContent = title;
+  const s = document.createElement('span'); s.textContent = sub;
+  b.append(c, s);
+}
+
 async function lookup(code){
-  busy = true;
+  busy = true; currentCode = code; currentFile = '';
   $('code-input').value = label(code);
-  setStatus('Đang tìm ảnh cho ' + label(code) + '…');
+  $('note').value = ''; $('logged').textContent = '';
+  setStatus('Đang kiểm tra ' + label(code) + '…');
   try {
     current = await findFiles(code);
+    $('result').hidden = false;
     if (!current.length) {
-      $('result').hidden = true;
-      return setStatus('Không có ảnh cho ' + label(code) + ' (thẻ không có trong thư mục).', 'err');
+      banner('errb', label(code), 'KHÔNG có trong hệ thống. Giữ thẻ và báo trưởng ca.');
+      $('photo').hidden = true; $('chips').innerHTML = ''; $('r-meta').textContent = '';
+      $('verify').hidden = true; $('r-drive').hidden = true;
+      setStatus('Thẻ không có ảnh đăng ký.', 'err');
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      logged = true;
+      await logCheck(code, 'Không có trong hệ thống', '');
+    } else {
+      banner('okb', label(code), 'Có trong hệ thống' + (current.length > 1 ? ' · ' + current.length + ' ảnh' : '') + '. Đối chiếu ảnh với người cầm thẻ.');
+      logged = false;
+      $('verify').hidden = false; $('r-drive').hidden = false;
+      setVerifyEnabled(true);
+      await showImage(0);
     }
-    $('r-code').textContent = label(code);
-    $('r-count').textContent = current.length > 1 ? current.length + ' ảnh, đang xem mới nhất' : '1 ảnh';
-    showImage(0);
+    $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (e) {
-    setStatus('Lỗi: ' + e.message, 'err');
+    if (!(e instanceof AuthError)) setStatus('Lỗi: ' + e.message, 'err');
   } finally { busy = false; }
 }
 
-function showImage(i){
+async function showImage(i){
   const f = current[i];
-  $('result').hidden = false;
-  $('r-drive').href = viewUrl(f.id);
-  $('r-full').href = imgUrl(f.id);
-  $('r-meta').textContent = f.name + (shotTime(f.name) ? ' · chụp ' + shotTime(f.name) : '') + ' · ' + Math.round((f.size || 0) / 1024) + ' KB';
-  const img = $('photo');
-  img.onerror = () => {
-    if (img.dataset.fb !== '1') { img.dataset.fb = '1'; img.src = imgUrl2(f.id); }
-    else setStatus('Không tải được ảnh. Kiểm tra thư mục đã chia sẻ "Bất kỳ ai có đường liên kết".', 'err');
-  };
-  img.onload = () => setStatus('Đã mở ảnh ' + f.name, 'ok');
-  img.dataset.fb = '0';
-  img.src = imgUrl(f.id);
-  setStatus('Đang tải ảnh…');
-
+  currentFile = f.name;
+  $('r-drive').href = 'https://drive.google.com/file/d/' + f.id + '/view';
+  $('r-meta').textContent = f.name + (shotTime(f.name) ? ' · chụp ' + shotTime(f.name) : '');
   const box = $('chips'); box.innerHTML = '';
   if (current.length > 1) current.forEach((x, k) => {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'chip';
     b.textContent = shotTime(x.name) || x.name;
     b.setAttribute('aria-current', k === i);
-    b.onclick = () => showImage(k);
+    b.onclick = () => showImage(k).catch(e => setStatus('Lỗi: ' + e.message, 'err'));
     box.append(b);
   });
-  $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setStatus('Đang tải ảnh…');
+  const r = await api(DRIVE + '/' + f.id + '?alt=media&supportsAllDrives=true');
+  if (!r.ok) throw new Error('Không tải được ảnh (lỗi ' + r.status + ')');
+  const blob = await r.blob();
+  if (photoUrl) URL.revokeObjectURL(photoUrl);
+  photoUrl = URL.createObjectURL(blob);
+  $('photo').src = photoUrl; $('photo').hidden = false;
+  setStatus('Đối chiếu ảnh rồi chọn kết quả.', 'ok');
 }
 
-$('btn-next').onclick = () => { window.scrollTo({ top: 0 }); startCam(); };
-
-if (API_KEY.indexOf('DAN_') === 0) {
-  setStatus('Chưa cấu hình API_KEY trong file.', 'err');
-  $('s-meta').textContent = 'Chưa có API key.';
-} else {
-  loadStats();
+function setVerifyEnabled(on){ $('btn-match').disabled = !on; $('btn-nomatch').disabled = !on; }
+async function verify(result){
+  if (logged) return;
+  logged = true; setVerifyEnabled(false);
+  if (result !== 'Đúng người' && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  setStatus(result === 'Đúng người' ? 'Hợp lệ.' : 'Không khớp. Giữ thẻ và báo trưởng ca.', result === 'Đúng người' ? 'ok' : 'err');
+  await logCheck(currentCode, result, currentFile);
 }
+$('btn-match').onclick = () => verify('Đúng người');
+$('btn-nomatch').onclick = () => verify('Không khớp');
+
+$('btn-next').onclick = () => {
+  if (mustVerifyFirst()) return;
+  window.scrollTo({ top: 0 });
+  ensureFresh().then(startCam).catch(e => setStatus(e.message, 'err'));
+};
+
+$('photo').onclick = () => { $('zoom-img').src = $('photo').src; $('zoom').hidden = false; };
+$('zoom-close').onclick = () => { $('zoom').hidden = true; };
+
+// ================= KHỞI ĐỘNG =================
+(function boot(){
+  if (window.google && google.accounts && google.accounts.oauth2 && !tokenClient) onGisLoad();
+  const t = sess.get('tok'), e = Number(sess.get('exp')) || 0;
+  if (t && e > Date.now() + 60000) { token = t; tokenExp = e; afterLogin(); }
+})();
 </script>
 </body>
 </html>
