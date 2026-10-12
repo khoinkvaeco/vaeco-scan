@@ -38,10 +38,12 @@
   .banner.okb{background:var(--ok-bg);color:var(--ok);border:1px solid var(--ok)}
   .banner.errb{background:var(--err-bg);color:var(--err);border:1px solid var(--err)}
   .banner span{font-weight:400;font-size:13px}
-  #photo{width:100%;border-radius:8px;background:var(--bg);display:block;min-height:160px;cursor:zoom-in}
+  #photos{display:grid;gap:10px}
+  #photos figure{margin:0;display:grid;gap:4px}
+  #photos img{width:100%;border-radius:8px;background:var(--bg);display:block;min-height:160px;cursor:zoom-in}
+  #photos figcaption a{color:inherit}
   .chips{display:flex;gap:6px;flex-wrap:wrap}
   .chip{font-family:var(--mono);font-size:12px;padding:6px 8px}
-  .chip[aria-current=true]{border-color:var(--accent);color:var(--accent);font-weight:700}
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
   .stat{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
   .stat b{display:block;font-size:22px;font-variant-numeric:tabular-nums;line-height:1.2}
@@ -90,9 +92,7 @@
 
     <section id="result" class="panel" hidden>
       <div id="banner" class="banner"></div>
-      <img id="photo" alt="Ảnh đăng ký của thẻ" hidden>
-      <div id="r-meta" class="meta"></div>
-      <div id="chips" class="chips"></div>
+      <div id="photos"></div>
       <div id="verify" class="row">
         <button id="btn-match" class="good" type="button">Đúng người</button>
         <button id="btn-nomatch" class="bad" type="button">Không khớp</button>
@@ -100,7 +100,6 @@
       <input id="note" type="text" placeholder="Ghi chú (không bắt buộc)" autocomplete="off">
       <div id="logged" class="meta"></div>
       <div class="row">
-        <a id="r-drive" class="btn" target="_blank" rel="noopener">Mở trên Drive</a>
         <button id="btn-next" class="primary" type="button">Kiểm tra thẻ tiếp</button>
       </div>
     </section>
@@ -130,6 +129,7 @@
 // ================= CẤU HÌNH =================
 const CLIENT_ID    = '87657856106-ie78sirdolp4f2s6op77h3r3ept3v97o.apps.googleusercontent.com';
 const FOLDER_ID    = '1tFHCwI826iLgvOwq6lep1phwi81OsV-9';
+const VERIFY_ENABLED = false;  // true: bắt chọn "Đúng người"/"Không khớp" sau khi xem ảnh. false: chỉ hiện ảnh.
 const LOG_SHEET_ID = '1OG6UyyzUCnubrL1mMxREBJwiKleAHsQwM_ot4FJpmDg';   // Google Sheet ghi nhật ký kiểm tra. Để '' nếu chưa dùng.
 // ============================================
 
@@ -240,13 +240,14 @@ function parseCode(raw, allowBare){
   return null;
 }
 const label = code => 'VAEC0-' + code.toUpperCase();
-// Tên file ảnh: <mã>-<MMDDhhmmss>.jpg, chấp nhận cả tiền tố "VAEC0-".
+// Tên file ảnh: <mã>-<MMDDhhmmss>.jpg; ảnh chụp thêm của cùng thẻ: <mã>_2-<MMDDhhmmss>_v.jpg.
+// Chấp nhận cả tiền tố "VAEC0-".
 function fileCode(name){
-  const m = String(name).match(/^(?:VAEC[O0][-_\s]*)?([A-Za-z0-9]+)-/i);
+  const m = String(name).match(/^(?:VAEC[O0][-_\s]*)?([A-Za-z0-9]+)(?:_[A-Za-z0-9]+)?-/i);
   return m ? m[1].toLowerCase() : null;
 }
 function shotTime(name){
-  const m = name.match(/-(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\./);
+  const m = name.match(/-(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:_[A-Za-z0-9]+)?\./);
   return m ? m[2] + '/' + m[1] + ' ' + m[3] + ':' + m[4] + ':' + m[5] : '';
 }
 
@@ -345,7 +346,7 @@ const pad = n => String(n).padStart(2, '0');
 function nowStr(){ const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
 
 async function logCheck(code, result, fileName){
-  addToday(result !== 'Đúng người');
+  addToday(result === 'Không khớp' || result === 'Không có trong hệ thống');
   if (!LOG_SHEET_ID) { $('logged').textContent = 'Đã ghi nhận trên máy này (chưa cấu hình Sheet nhật ký).'; return; }
   $('logged').textContent = 'Đang ghi nhật ký…';
   try {
@@ -437,7 +438,7 @@ $('manual').onsubmit = e => {
 };
 
 // ================= TRA CỨU + ĐỐI CHIẾU =================
-let current = [], currentCode = '', currentFile = '', photoUrl = null, logged = false;
+let current = [], currentCode = '', currentFile = '', photoUrls = [], logged = false;
 
 function banner(kind, title, sub){
   const b = $('banner');
@@ -458,18 +459,18 @@ async function lookup(code){
     $('result').hidden = false;
     if (!current.length) {
       banner('errb', label(code), 'KHÔNG có trong hệ thống. Giữ thẻ và báo trưởng ca.');
-      $('photo').hidden = true; $('chips').innerHTML = ''; $('r-meta').textContent = '';
-      $('verify').hidden = true; $('r-drive').hidden = true;
+      clearPhotos();
+      $('verify').hidden = $('note').hidden = true;
       setStatus('Thẻ không có ảnh đăng ký.', 'err');
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
       logged = true;
       await logCheck(code, 'Không có trong hệ thống', '');
     } else {
-      banner('okb', label(code), 'Có trong hệ thống' + (current.length > 1 ? ' · ' + current.length + ' ảnh' : '') + '. Đối chiếu ảnh với người cầm thẻ.');
-      logged = false;
-      $('verify').hidden = false; $('r-drive').hidden = false;
-      setVerifyEnabled(true);
-      await showImage(0);
+      banner('okb', label(code), 'Có trong hệ thống' + (current.length > 1 ? ' · ' + current.length + ' ảnh' : '') + (VERIFY_ENABLED ? '. Đối chiếu ảnh với người cầm thẻ.' : '.'));
+      $('verify').hidden = $('note').hidden = !VERIFY_ENABLED;
+      if (VERIFY_ENABLED) { logged = false; setVerifyEnabled(true); }
+      await showImages();
+      if (!VERIFY_ENABLED) { logged = true; await logCheck(code, 'Có trong hệ thống', currentFile); }
     }
     $('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (e) {
@@ -477,28 +478,41 @@ async function lookup(code){
   } finally { busy = false; }
 }
 
-async function showImage(i){
-  const f = current[i];
-  currentFile = f.name;
-  $('r-drive').href = 'https://drive.google.com/file/d/' + f.id + '/view';
-  $('r-meta').textContent = f.name + (shotTime(f.name) ? ' · chụp ' + shotTime(f.name) : '');
-  const box = $('chips'); box.innerHTML = '';
-  if (current.length > 1) current.forEach((x, k) => {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'chip';
-    b.textContent = shotTime(x.name) || x.name;
-    b.setAttribute('aria-current', k === i);
-    b.onclick = () => showImage(k).catch(e => setStatus('Lỗi: ' + e.message, 'err'));
-    box.append(b);
+function clearPhotos(){
+  photoUrls.forEach(u => URL.revokeObjectURL(u)); photoUrls = [];
+  $('photos').innerHTML = '';
+}
+// Hiện tất cả ảnh của thẻ cùng lúc (mới nhất trước), tải song song.
+async function showImages(){
+  clearPhotos();
+  currentFile = current.map(f => f.name).join('; ');
+  setStatus('Đang tải ' + (current.length > 1 ? current.length + ' ảnh' : 'ảnh') + '…');
+  const figs = current.map(f => {
+    const fig = document.createElement('figure');
+    const img = document.createElement('img');
+    img.alt = 'Ảnh đăng ký ' + f.name;
+    img.onclick = () => { if (img.src) { $('zoom-img').src = img.src; $('zoom').hidden = false; } };
+    const cap = document.createElement('figcaption'); cap.className = 'meta';
+    const a = document.createElement('a');
+    a.href = 'https://drive.google.com/file/d/' + f.id + '/view'; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = f.name;
+    cap.append(a, shotTime(f.name) ? ' · chụp ' + shotTime(f.name) : '');
+    fig.append(img, cap);
+    $('photos').append(fig);
+    return img;
   });
-  setStatus('Đang tải ảnh…');
-  const r = await api(DRIVE + '/' + f.id + '?alt=media&supportsAllDrives=true');
-  if (!r.ok) throw new Error('Không tải được ảnh (lỗi ' + r.status + ')');
-  const blob = await r.blob();
-  if (photoUrl) URL.revokeObjectURL(photoUrl);
-  photoUrl = URL.createObjectURL(blob);
-  $('photo').src = photoUrl; $('photo').hidden = false;
-  setStatus('Đối chiếu ảnh rồi chọn kết quả.', 'ok');
+  const results = await Promise.allSettled(current.map(async (f, k) => {
+    const r = await api(DRIVE + '/' + f.id + '?alt=media&supportsAllDrives=true');
+    if (!r.ok) throw new Error('lỗi ' + r.status);
+    const u = URL.createObjectURL(await r.blob());
+    photoUrls.push(u);
+    figs[k].src = u;
+  }));
+  const auth = results.find(x => x.status === 'rejected' && x.reason instanceof AuthError);
+  if (auth) throw auth.reason;
+  const failed = results.filter(x => x.status === 'rejected').length;
+  if (failed) setStatus('Không tải được ' + failed + '/' + current.length + ' ảnh. Bấm tên file để mở trên Drive.', 'warn');
+  else setStatus(VERIFY_ENABLED ? 'Đối chiếu ảnh rồi chọn kết quả.' : 'Đối chiếu ảnh với người cầm thẻ.', 'ok');
 }
 
 function setVerifyEnabled(on){ $('btn-match').disabled = !on; $('btn-nomatch').disabled = !on; }
@@ -518,7 +532,6 @@ $('btn-next').onclick = () => {
   ensureFresh().then(startCam).catch(e => setStatus(e.message, 'err'));
 };
 
-$('photo').onclick = () => { $('zoom-img').src = $('photo').src; $('zoom').hidden = false; };
 $('zoom-close').onclick = () => { $('zoom').hidden = true; };
 
 // ================= KHỞI ĐỘNG =================
